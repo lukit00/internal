@@ -66,7 +66,7 @@ local Config = {
 local ExunysDeveloperAimbot = loadstring(game:HttpGet("https://raw.githubusercontent.com/Exunys/Aimbot-V3/refs/heads/main/src/Aimbot.lua"))()
 local ExunysDeveloperESP = loadstring(game:HttpGet("https://raw.githubusercontent.com/Exunys/Exunys-ESP/refs/heads/main/src/ESP.lua"))()
     
--- Função de gradiente (copie para o início do seu código, antes da InitializeMainUI)
+
 local function gradient(text, startColor, endColor)
     local result = ""
     local length = #text
@@ -88,17 +88,15 @@ local State = {
         Godmode = {active = false, toggle = nil},
         CameraFOV = Config.Defaults.CameraFOV,
 ESP = {
-        active = false,
-        loaded = false,
-        color = Color3.fromRGB(255, 255, 255),
-        boxColor = Color3.fromRGB(138, 43, 226),
-        invisibleBoxColor = Color3.fromRGB(255, 0, 0),
-        selfESP = false,          -- NOVO
-        visibleCheck = true,      -- NOVO
-        toggle = nil,
-        selfESPToggle = nil,      -- para referência na UI
-        visibleCheckToggle = nil
-    },
+    active = false,
+    loaded = false,
+    color = Color3.fromRGB(255, 255, 255),
+    boxColor = Color3.fromRGB(138, 43, 226),
+    tracerColor = Color3.fromRGB(138, 43, 226),
+    showLocalPlayer = false,
+    visibleCheck = false,
+    toggle = nil
+},
         CarESP = {
     active = false,
     toggle = nil
@@ -181,10 +179,9 @@ MagicBullet = {
 HeadHitboxExpander = {
     active = false,
     size = 10,
-    transparency = 1,
+    transparency = 0.5,
     toggle = nil,
-    originalSizes = {},
-    playerAddedConnection = nil  -- ADICIONAR ESTA LINHA
+    hitboxParts = {}
 },
         Noclip = {
             active = false,
@@ -463,72 +460,116 @@ function VisualModule.LoadESP()
     if State.Features.ESP.loaded then
         return true, "ESP já carregado"
     end
-   
+    
     local success, err = pcall(function()
-        -- Configurações básicas
         ExunysDeveloperESP.Settings.Enabled = false
         ExunysDeveloperESP.Settings.TeamCheck = false
         ExunysDeveloperESP.Settings.AliveCheck = true
         ExunysDeveloperESP.Settings.LoadConfigOnLaunch = false
         ExunysDeveloperESP.Settings.PartsOnly = false
+        ExunysDeveloperESP.Settings.ShowLocalPlayer = State.Features.ESP.showLocalPlayer
         
-        -- CRÍTICO: Self ESP e Visible Check
-        ExunysDeveloperESP.Settings.SelfESP = State.Features.ESP.selfESP
-        ExunysDeveloperESP.Settings.VisibleCheck = State.Features.ESP.visibleCheck
+        -- ESP Text
+        ExunysDeveloperESP.Properties.ESP.Enabled = true
+        ExunysDeveloperESP.Properties.ESP.Color = State.Features.ESP.color
+        ExunysDeveloperESP.Properties.ESP.Transparency = 1
+        ExunysDeveloperESP.Properties.ESP.Size = 14
+        ExunysDeveloperESP.Properties.ESP.Font = Drawing.Fonts.Plex
+        ExunysDeveloperESP.Properties.ESP.Outline = true
+        ExunysDeveloperESP.Properties.ESP.OutlineColor = Color3.fromRGB(0, 0, 0)
+        ExunysDeveloperESP.Properties.ESP.DisplayDistance = true
+        ExunysDeveloperESP.Properties.ESP.DisplayHealth = true
+        ExunysDeveloperESP.Properties.ESP.DisplayName = true
+        ExunysDeveloperESP.Properties.ESP.DisplayDisplayName = true
+        ExunysDeveloperESP.Properties.ESP.DisplayTool = true
+        ExunysDeveloperESP.Properties.ESP.Offset = 10
         
-        -- Configuração da Box
+        -- Box
         ExunysDeveloperESP.Properties.Box.Enabled = true
         ExunysDeveloperESP.Properties.Box.Color = State.Features.ESP.boxColor
-        ExunysDeveloperESP.Properties.Box.VisibleColor = State.Features.ESP.boxColor
-        ExunysDeveloperESP.Properties.Box.InvisibleColor = State.Features.ESP.invisibleBoxColor
         ExunysDeveloperESP.Properties.Box.Thickness = 2
         ExunysDeveloperESP.Properties.Box.Transparency = 1
         ExunysDeveloperESP.Properties.Box.Filled = false
         ExunysDeveloperESP.Properties.Box.Outline = true
         ExunysDeveloperESP.Properties.Box.OutlineColor = Color3.fromRGB(0, 0, 0)
         
-        -- DESATIVAR TRACERS (linhas conectando)
-        ExunysDeveloperESP.Properties.Tracer.Enabled = false
-        ExunysDeveloperESP.Properties.Tracer.From = "Bottom"
-        ExunysDeveloperESP.Properties.Tracer.Color = Color3.fromRGB(255, 255, 255)
-        ExunysDeveloperESP.Properties.Tracer.Thickness = 1
-        ExunysDeveloperESP.Properties.Tracer.Transparency = 1
-        
-        -- Configuração de Chams
-        ExunysDeveloperESP.Properties.Chams.Enabled = false
-        ExunysDeveloperESP.Properties.Chams.Color = State.Features.Chams.fillColor
-        ExunysDeveloperESP.Properties.Chams.Transparency = 0.5
-        ExunysDeveloperESP.Properties.Chams.Wireframe = false
-        
-        -- Configuração de texto/nome
-        ExunysDeveloperESP.Properties.Name.Enabled = true
-        ExunysDeveloperESP.Properties.Name.Color = State.Features.ESP.color
-        ExunysDeveloperESP.Properties.Name.Outline = true
-        ExunysDeveloperESP.Properties.Name.OutlineColor = Color3.fromRGB(0, 0, 0)
-        
-        -- Distância
-        ExunysDeveloperESP.Properties.Distance.Enabled = true
-        ExunysDeveloperESP.Properties.Distance.Color = State.Features.ESP.color
-        ExunysDeveloperESP.Properties.Distance.Outline = true
-        ExunysDeveloperESP.Properties.Distance.OutlineColor = Color3.fromRGB(0, 0, 0)
-        
-        -- Health bar
+        -- HealthBar
         ExunysDeveloperESP.Properties.HealthBar.Enabled = true
+        ExunysDeveloperESP.Properties.HealthBar.Position = 3
+        ExunysDeveloperESP.Properties.HealthBar.Thickness = 1
+        ExunysDeveloperESP.Properties.HealthBar.Transparency = 1
         ExunysDeveloperESP.Properties.HealthBar.Outline = true
         ExunysDeveloperESP.Properties.HealthBar.OutlineColor = Color3.fromRGB(0, 0, 0)
+        ExunysDeveloperESP.Properties.HealthBar.Offset = 4
+        ExunysDeveloperESP.Properties.HealthBar.Blue = 100
         
-        -- INICIAR O ESP
-        ExunysDeveloperESP()
+        -- Tracer
+        ExunysDeveloperESP.Properties.Tracer.Enabled = false
+        ExunysDeveloperESP.Properties.Tracer.Origin = "Bottom"
+        ExunysDeveloperESP.Properties.Tracer.Color = State.Features.ESP.tracerColor
+        ExunysDeveloperESP.Properties.Tracer.Thickness = 2
+        ExunysDeveloperESP.Properties.Tracer.Transparency = 1
+        ExunysDeveloperESP.Properties.Tracer.Outline = true
+        ExunysDeveloperESP.Properties.Tracer.OutlineColor = Color3.fromRGB(0, 0, 0)
+        
+        -- Chams
+        ExunysDeveloperESP.Properties.Chams.Enabled = false
+        ExunysDeveloperESP.Properties.Chams.Color = State.Features.Chams.fillColor
+        ExunysDeveloperESP.Properties.Chams.Transparency = 0.3
+        ExunysDeveloperESP.Properties.Chams.Thickness = 1
+        ExunysDeveloperESP.Properties.Chams.Filled = false
+        ExunysDeveloperESP.Properties.Chams.VisibleCheck = State.Features.ESP.visibleCheck
+        
+        -- Desativar unused
+        ExunysDeveloperESP.Properties.HeadDot.Enabled = false
+        ExunysDeveloperESP.Properties.Crosshair.Enabled = false
+        
+        -- Carregar ESP
+        if type(ExunysDeveloperESP.Load) == "function" then
+            ExunysDeveloperESP.Load()
+        else
+            local mt = getmetatable(ExunysDeveloperESP)
+            if mt and mt.__call then
+                ExunysDeveloperESP()
+            end
+        end
         
         State.Features.ESP.loaded = true
     end)
-
+    
     if not success then
         warn("[DN Menu] Erro ao carregar ESP:", err)
         return false, err
     end
     
     return true, "ESP carregado com sucesso"
+end
+
+function VisualModule.UpdateTracerColor(color)
+    State.Features.ESP.tracerColor = color
+    if State.Features.ESP.loaded then
+        ExunysDeveloperESP.Properties.Tracer.Color = color
+    end
+end
+
+function VisualModule.ToggleTracer(enabled)
+    if State.Features.ESP.loaded then
+        ExunysDeveloperESP.Properties.Tracer.Enabled = enabled
+    end
+end
+
+function VisualModule.ToggleSelfESP(enabled)
+    State.Features.ESP.showLocalPlayer = enabled
+    if State.Features.ESP.loaded then
+        ExunysDeveloperESP.Settings.ShowLocalPlayer = enabled
+    end
+end
+
+function VisualModule.ToggleVisibleCheck(enabled)
+    State.Features.ESP.visibleCheck = enabled
+    if State.Features.ESP.loaded then
+        ExunysDeveloperESP.Properties.Chams.VisibleCheck = enabled
+    end
 end
 
 function VisualModule.ActivateESP(enabled)
@@ -1147,125 +1188,85 @@ do
         return {att0 = att0, att1 = att1, alignPos = alignPos, alignOri = alignOri}
     end
     function ExploitModule.ActivateVehicleFly(enabled)
-        local feature = State.Features.VehicleFly
-        feature.active = enabled
-        if enabled then
-            if feature.connection then return end
-            feature.active = true
-            -- attempt to attach to nearest A-Chassis vehicle
-            local vehicle = Utils.FindAChassisVehicle(nil) or Utils.GetNearestVehicle()
-            local mainPart = vehicle and Utils.GetVehicleMainPart(vehicle)
-            if mainPart and mainPart:IsA("BasePart") and vehicle then
-                -- attach Aligns to vehicle main part (apply aligns to HRP to follow vehicle or apply to vehicle itself)
-                -- prefer to move the vehicle main part directly for smoother vehicle fly
-                -- create aligns on mainPart.Parent PrimaryPart (or mainPart itself)
-                local targetPart = mainPart
-                -- create aligns on targetPart to control its position/orientation
-                local aligns = createAligns(targetPart, targetPart)
-                feature.aligns = aligns
-                -- store which part we're controlling
-                feature.controlledPart = targetPart
-            else
-                -- fallback: use BodyVelocity on player HRP
-                local hrp = Utils.GetRootPart()
-                if hrp then
-                    feature.bodyVelocity = createBV(hrp)
-                    feature.controlledPart = hrp
-                else
-                    warn("[DN Menu] VehicleFly: nenhum HRP encontrado para fallback.")
-                end
-            end
-            -- Heartbeat loop to update velocity/move
-            feature.connection = Utils.AddConnection(Services.RunService.Heartbeat:Connect(function()
-                if not feature.active then return end
-                local cam = Services.Workspace.CurrentCamera
-                if not cam then return end
-                local speed = feature.speed or 50
-                local mv = Vector3.new(0,0,0)
-                local w = Services.UserInputService:IsKeyDown(Enum.KeyCode.W)
-                local s = Services.UserInputService:IsKeyDown(Enum.KeyCode.S)
-                local a = Services.UserInputService:IsKeyDown(Enum.KeyCode.A)
-                local d = Services.UserInputService:IsKeyDown(Enum.KeyCode.D)
-                local spc = Services.UserInputService:IsKeyDown(Enum.KeyCode.Space)
-                local lshift = Services.UserInputService:IsKeyDown(Enum.KeyCode.LeftShift)
-                if w then mv = mv + cam.CFrame.LookVector end
-                if s then mv = mv - cam.CFrame.LookVector end
-                if a then mv = mv - cam.CFrame.RightVector end
-                if d then mv = mv + cam.CFrame.RightVector end
-                if spc then mv = mv + Vector3.new(0,1,0) end
-                if lshift then mv = mv - Vector3.new(0,1,0) end
-                if mv.Magnitude > 0 then mv = mv.Unit * speed else mv = Vector3.new(0,0,0) end
-                -- if using aligns, set target positions by moving Attachment1 via CFrame (Aligns will try to match)
-                if feature.aligns and feature.controlledPart and feature.aligns.att1 and feature.aligns.att0 then
-                    -- compute desired world position
-                    local current = feature.controlledPart.CFrame
-                    local desired = current + mv * Services.RunService.Heartbeat:Wait() -- small predictive step
-                    -- apply by moving the attachment on the parent to the desired CFrame (if att1 is on same part, move att0 instead)
-                    -- simpler: set the AlignPosition/Orientation properties via attachments' world position (approx)
-                    pcall(function()
-                        feature.aligns.att1.WorldPosition = desired.Position
-                        feature.aligns.att1.WorldOrientation = desired - desired.Position -- assign via CFrame? property may not exist; fallback below
-                    end)
-                    -- Note: If direct WorldPosition/WorldOrientation isn't supported on the executor, fallback to setting BodyVelocity
-                    if feature.bodyVelocity and feature.bodyVelocity.Parent then
-                        feature.bodyVelocity.Velocity = mv
-                    end
-                else
-                    if feature.bodyVelocity and feature.bodyVelocity.Parent then
-                        feature.bodyVelocity.Velocity = mv
-                    end
-                end
-            end))
-        else
-            -- disable: cleanup aligns, BV and connection
-            feature.active = false
-            if feature.connection then pcall(function() feature.connection:Disconnect() end) end
-            feature.connection = nil
-            if feature.bodyVelocity and feature.bodyVelocity.Parent then pcall(function() feature.bodyVelocity:Destroy() end) end
-            feature.bodyVelocity = nil
-            if feature.aligns then
-                pcall(function()
-                    if feature.aligns.alignPos then feature.aligns.alignPos:Destroy() end
-                    if feature.aligns.alignOri then feature.aligns.alignOri:Destroy() end
-                    if feature.aligns.att0 then feature.aligns.att0:Destroy() end
-                    if feature.aligns.att1 then feature.aligns.att1:Destroy() end
-                end)
-                feature.aligns = nil
-            end
-            -- reset physics on controlled part (HRP or vehicle part)
-            if feature.controlledPart and feature.controlledPart:IsA("BasePart") then
-                pcall(function()
-                    feature.controlledPart.Velocity = Vector3.new(0,0,0)
-                    feature.controlledPart.RotVelocity = Vector3.new(0,0,0)
-                end)
-                feature.controlledPart = nil
-            end
-        end
-    end
-end
-function ExploitModule.ActivateVehicleNoclip(enabled)
-    local feature = State.Features.VehicleNoclip
+    local feature = State.Features.VehicleFly
     feature.active = enabled
+    
     if enabled then
-        feature.connection = Services.RunService.Stepped:Connect(function()
-            local currentTime = tick()
-            if currentTime - (feature.lastUpdate or 0) < 0.1 then return end
-            feature.lastUpdate = currentTime
-            local humanoid = Utils.GetHumanoid()
-            if not humanoid or not humanoid.SeatPart then return end
-            local vehicle = humanoid.SeatPart.Parent
-            for _, part in ipairs(vehicle:GetChildren()) do
-                if part:IsA("BasePart") then
-                    part.CanCollide = false
-                end
+        if feature.connection then return end
+        
+        local hrp = Utils.GetRootPart()
+        if not hrp then 
+            warn("[DN Menu] VehicleFly: HRP não encontrado")
+            return 
+        end
+        
+        -- Criar BodyVelocity
+        feature.bodyVelocity = Instance.new("BodyVelocity")
+        feature.bodyVelocity.Name = "DNMenu_VehicleFly"
+        feature.bodyVelocity.MaxForce = Vector3.new(9e9, 9e9, 9e9)
+        feature.bodyVelocity.P = 1250
+        feature.bodyVelocity.Velocity = Vector3.new(0, 0, 0)
+        feature.bodyVelocity.Parent = hrp
+        
+        -- Loop de movimento
+        feature.connection = Services.RunService.Heartbeat:Connect(function()
+            if not feature.active then return end
+            
+            local cam = Services.Workspace.CurrentCamera
+            if not cam then return end
+            
+            local speed = feature.speed or 50
+            local moveVector = Vector3.new(0, 0, 0)
+            
+            -- Detectar teclas
+            local w = Services.UserInputService:IsKeyDown(Enum.KeyCode.W)
+            local s = Services.UserInputService:IsKeyDown(Enum.KeyCode.S)
+            local a = Services.UserInputService:IsKeyDown(Enum.KeyCode.A)
+            local d = Services.UserInputService:IsKeyDown(Enum.KeyCode.D)
+            local space = Services.UserInputService:IsKeyDown(Enum.KeyCode.Space)
+            local shift = Services.UserInputService:IsKeyDown(Enum.KeyCode.LeftShift)
+            
+            if w then moveVector = moveVector + cam.CFrame.LookVector end
+            if s then moveVector = moveVector - cam.CFrame.LookVector end
+            if a then moveVector = moveVector - cam.CFrame.RightVector end
+            if d then moveVector = moveVector + cam.CFrame.RightVector end
+            if space then moveVector = moveVector + Vector3.new(0, 1, 0) end
+            if shift then moveVector = moveVector - Vector3.new(0, 1, 0) end
+            
+            if moveVector.Magnitude > 0 then
+                moveVector = moveVector.Unit * speed
+            else
+                moveVector = Vector3.new(0, 0, 0)
+            end
+            
+            if feature.bodyVelocity and feature.bodyVelocity.Parent then
+                feature.bodyVelocity.Velocity = moveVector
             end
         end)
     else
+        -- Desativar
+        feature.active = false
+        
         if feature.connection then
-            feature.connection:Disconnect()
+            pcall(function() feature.connection:Disconnect() end)
             feature.connection = nil
         end
+        
+        if feature.bodyVelocity and feature.bodyVelocity.Parent then
+            pcall(function() feature.bodyVelocity:Destroy() end)
+            feature.bodyVelocity = nil
+        end
+        
+        -- Resetar velocidade do HRP
+        local hrp = Utils.GetRootPart()
+        if hrp then
+            pcall(function()
+                hrp.Velocity = Vector3.new(0, 0, 0)
+                hrp.RotVelocity = Vector3.new(0, 0, 0)
+            end)
+        end
     end
+end
 end
 
 
@@ -1665,149 +1666,73 @@ function CombatModule.ActivateHeadHitboxExpander(enabled)
     feature.active = enabled
     
     if enabled then
-        -- Ativar: criar hitboxes invisíveis maiores
         for _, player in ipairs(Services.Players:GetPlayers()) do
             if player ~= LocalPlayer and player.Character then
                 local head = player.Character:FindFirstChild("Head")
-                if head and head:IsA("BasePart") then
-                    -- Salvar tamanho original
-                    if not feature.originalSizes[player.UserId] then
-                        feature.originalSizes[player.UserId] = head.Size
-                    end
+                if head then
+                    local hitbox = Instance.new("Part")
+                    hitbox.Name = "Hitbox"
+                    hitbox.Transparency = feature.transparency
+                    hitbox.Size = Vector3.new(feature.size, feature.size, feature.size)
+                    hitbox.CanCollide = false
+                    hitbox.Anchored = false
+                    hitbox.Material = Enum.Material.Neon
+                    hitbox.Color = Color3.fromRGB(138, 43, 226)
+                    hitbox.CFrame = head.CFrame
+                    hitbox.Massless = true
                     
-                    -- IMPORTANTE: Não alterar a propriedade Size visualmente
-                    -- Criar hitbox invisível maior
-                    local hitbox = head:FindFirstChild("DNMenu_Hitbox")
-                    if not hitbox then
-                        hitbox = Instance.new("Part")
-                        hitbox.Name = "DNMenu_Hitbox"
-                        hitbox.Size = Vector3.new(feature.size, feature.size, feature.size)
-                        hitbox.Transparency = 1
-                        hitbox.CanCollide = false
-                        hitbox.Massless = true
-                        hitbox.CFrame = head.CFrame
-                        
-                        local weld = Instance.new("WeldConstraint")
-                        weld.Part0 = head
-                        weld.Part1 = hitbox
-                        weld.Parent = hitbox
-                        
-                        hitbox.Parent = head
-                    else
-                        hitbox.Size = Vector3.new(feature.size, feature.size, feature.size)
-                    end
+                    local weld = Instance.new("Weld")
+                    weld.Part0 = head
+                    weld.Part1 = hitbox
+                    weld.C0 = CFrame.new()
+                    weld.Parent = hitbox
+                    
+                    hitbox.Parent = head
+                    feature.hitboxParts[player.UserId] = hitbox
                 end
             end
         end
         
-        -- Hook para novos jogadores
-        if not feature.playerAddedConnection then
-            feature.playerAddedConnection = Services.Players.PlayerAdded:Connect(function(player)
-                if feature.active then
-                    player.CharacterAdded:Connect(function(char)
-                        task.wait(0.5)
-                        local head = char:FindFirstChild("Head")
-                        if head and head:IsA("BasePart") and feature.active then
-                            if not feature.originalSizes[player.UserId] then
-                                feature.originalSizes[player.UserId] = head.Size
-                            end
-                            
-                            local hitbox = head:FindFirstChild("DNMenu_Hitbox")
-                            if not hitbox then
-                                hitbox = Instance.new("Part")
-                                hitbox.Name = "DNMenu_Hitbox"
-                                hitbox.Size = Vector3.new(feature.size, feature.size, feature.size)
-                                hitbox.Transparency = 1
-                                hitbox.CanCollide = false
-                                hitbox.Massless = true
-                                hitbox.CFrame = head.CFrame
-                                
-                                local weld = Instance.new("WeldConstraint")
-                                weld.Part0 = head
-                                weld.Part1 = hitbox
-                                weld.Parent = hitbox
-                                
-                                hitbox.Parent = head
-                            end
-                        end
-                    end)
+        Services.Players.PlayerAdded:Connect(function(player)
+            if not feature.active then return end
+            player.CharacterAdded:Connect(function(char)
+                task.wait(0.5)
+                if not feature.active then return end
+                local head = char:FindFirstChild("Head")
+                if head then
+                    local hitbox = Instance.new("Part")
+                    hitbox.Name = "Hitbox"
+                    hitbox.Transparency = feature.transparency
+                    hitbox.Size = Vector3.new(feature.size, feature.size, feature.size)
+                    hitbox.CanCollide = false
+                    hitbox.Anchored = false
+                    hitbox.Material = Enum.Material.Neon
+                    hitbox.Color = Color3.fromRGB(138, 43, 226)
+                    hitbox.CFrame = head.CFrame
+                    hitbox.Massless = true
+                    
+                    local weld = Instance.new("Weld")
+                    weld.Part0 = head
+                    weld.Part1 = hitbox
+                    weld.C0 = CFrame.new()
+                    weld.Parent = hitbox
+                    
+                    hitbox.Parent = head
+                    feature.hitboxParts[player.UserId] = hitbox
                 end
             end)
-        end
+        end)
     else
-        -- Desativar: remover hitboxes invisíveis
-        for _, player in ipairs(Services.Players:GetPlayers()) do
-            if player ~= LocalPlayer and player.Character then
-                local head = player.Character:FindFirstChild("Head")
-                if head then
-                    local hitbox = head:FindFirstChild("DNMenu_Hitbox")
-                    if hitbox then
-                        hitbox:Destroy()
-                    end
-                end
+        for _, hitbox in pairs(feature.hitboxParts) do
+            if hitbox and hitbox.Parent then
+                hitbox:Destroy()
             end
         end
-        
-        if feature.playerAddedConnection then
-            feature.playerAddedConnection:Disconnect()
-            feature.playerAddedConnection = nil
-        end
-        
-        feature.originalSizes = {}
+        feature.hitboxParts = {}
     end
 end
 
-function CombatModule.SetHeadHitboxSize(size)
-    State.Features.HeadHitboxExpander.size = size
-    if State.Features.HeadHitboxExpander.active then
-        -- Atualizar apenas as hitboxes invisíveis
-        for _, player in ipairs(Services.Players:GetPlayers()) do
-            if player ~= LocalPlayer and player.Character then
-                local head = player.Character:FindFirstChild("Head")
-                if head then
-                    local hitbox = head:FindFirstChild("DNMenu_Hitbox")
-                    if hitbox then
-                        hitbox.Size = Vector3.new(size, size, size)
-                    end
-                end
-            end
-        end
-    end
-end
 
-function CombatModule.SetHeadHitboxTransparency(trans)
-    -- Esta função agora é apenas para compatibilidade
-    -- A hitbox sempre será invisível (transparency = 1)
-    State.Features.HeadHitboxExpander.transparency = 1
-end
-
-function CombatModule.SetHeadHitboxSize(size)
-    State.Features.HeadHitboxExpander.size = size
-    if State.Features.HeadHitboxExpander.active then
-        for _, player in ipairs(Services.Players:GetPlayers()) do
-            if player ~= LocalPlayer and player.Character then
-                local head = player.Character:FindFirstChild("Head")
-                if head then
-                    head.Size = Vector3.new(size, size, size)
-                end
-            end
-        end
-    end
-end
-
-function CombatModule.SetHeadHitboxTransparency(trans)
-    State.Features.HeadHitboxExpander.transparency = trans
-    if State.Features.HeadHitboxExpander.active then
-        for _, player in ipairs(Services.Players:GetPlayers()) do
-            if player ~= LocalPlayer and player.Character then
-                local head = player.Character:FindFirstChild("Head")
-                if head then
-                    head.Transparency = trans
-                end
-            end
-        end
-    end
-end
 
 -- ==========================================
 -- MÓDULO LISTA DE JOGADORES
@@ -2144,36 +2069,59 @@ end
 -- CLEANUP COMPLETO
 -- ==========================================
 local function PerformCleanup()
+    -- Anti-Kick durante cleanup
+    local oldNamecall
+    oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
+        local method = getnamecallmethod()
+        if method == "Kick" then
+            return
+        end
+        return oldNamecall(self, ...)
+    end)
+    
+    -- Exorcismo primeiro
     if State.Features.Exorcismo.active then
         ExploitModule.ActivateExorcismo(false)
         task.wait(0.3)
     end
-if State.Features.ESP.loaded then
-    pcall(function()
-        ExunysDeveloperESP:Exit()
-    end)
-    State.Features.ESP.loaded = false
-end
-
-if State.Features.Aimbot.Loaded then
-    if Utils.IsMobile() then
-        if State.Features.Aimbot.mobileConnection then
-            State.Features.Aimbot.mobileConnection:Disconnect()
-            State.Features.Aimbot.mobileConnection = nil
-        end
-        if State.Features.Aimbot.mobileFOVring then
-            State.Features.Aimbot.mobileFOVring:Remove()
-            State.Features.Aimbot.mobileFOVring = nil
-        end
-    else
+    
+    -- ESP Cleanup
+    if State.Features.ESP.loaded then
         pcall(function()
-            ExunysDeveloperAimbot:Exit()
+            ExunysDeveloperESP.Settings.Enabled = false
+            if type(ExunysDeveloperESP.Exit) == "function" then
+                ExunysDeveloperESP:Exit()
+            end
         end)
+        State.Features.ESP.loaded = false
     end
-    State.Features.Aimbot.Loaded = false
-end
+    
+    -- Aimbot Cleanup
+    if State.Features.Aimbot.Loaded then
+        if Utils.IsMobile() then
+            if State.Features.Aimbot.mobileConnection then
+                State.Features.Aimbot.mobileConnection:Disconnect()
+                State.Features.Aimbot.mobileConnection = nil
+            end
+            if State.Features.Aimbot.mobileFOVring then
+                State.Features.Aimbot.mobileFOVring:Remove()
+                State.Features.Aimbot.mobileFOVring = nil
+            end
+        else
+            pcall(function()
+                ExunysDeveloperAimbot.Settings.Enabled = false
+                if type(ExunysDeveloperAimbot.Exit) == "function" then
+                    ExunysDeveloperAimbot:Exit()
+                end
+            end)
+        end
+        State.Features.Aimbot.Loaded = false
+    end
+    
+    -- Desativar features
     VisualModule.ActivateChams(false)
     VisualModule.ActivateFullbright(false)
+    VisualModule.ActivateCarESP(false)
     ExploitModule.ActivateGunPull(false)
     ExploitModule.ActivateBangPlayer(false)
     ExploitModule.ActivateVehicleLauncher(false)
@@ -2181,53 +2129,87 @@ end
     ExploitModule.ActivateVehicleDelete(false)
     ExploitModule.ActivateVehicleFly(false)
     ExploitModule.ActivateVehicleNoclip(false)
-    CombatModule.ActivateHitboxExpander(false)
     CombatModule.ActivateHeadHitboxExpander(false)
     PlayerModule.ActivateNoclip(false)
     PlayerModule.ActivateSpeed(false)
     PlayerModule.ActivateJumpPower(false)
+    
+    -- Limpar connections
     for _, feature in pairs(State.Features) do
         if feature.connection then
             Utils.ClearConnections({feature.connection})
+            feature.connection = nil
         end
         if feature.connections then
             Utils.ClearConnections(feature.connections)
+            feature.connections = {}
         end
     end
+    
+    -- Cleanups específicos
     PortaMalasModule.StopMonitoring()
-    if getgenv().DNMenuAimbot then
-        State.Features.Aimbot.Enabled = false
-        CombatModule.UpdateAimbotSettings()
-        if getgenv().DNMenuAimbot.FOVBox then
-            getgenv().DNMenuAimbot.FOVBox:Remove()
-        end
-        if getgenv().DNMenuAimbot.SilentFOVBox then
-            getgenv().DNMenuAimbot.SilentFOVBox:Remove()
-        end
-        getgenv().DNMenuAimbot = nil
-    end
     PortaMalasModule.ClearClonedTrunk()
+    
     if State.Features.Chams.folder then
-        State.Features.Chams.folder:Destroy()
+        pcall(function() State.Features.Chams.folder:Destroy() end)
     end
-    for _, billboard in pairs(State.Features.ESP.billboards) do
-        if billboard then billboard:Destroy() end
+    
+    if State.Features.HeadHitboxExpander.hitboxParts then
+        for _, hitbox in pairs(State.Features.HeadHitboxExpander.hitboxParts) do
+            if hitbox and hitbox.Parent then
+                hitbox:Destroy()
+            end
+        end
+        State.Features.HeadHitboxExpander.hitboxParts = {}
     end
-    State.Features.ESP.billboards = {}
-    if State.Features.Fullbright.active then
-        VisualModule.ActivateFullbright(false)
+    
+    -- Limpar parts suspeitas
+    for _, obj in ipairs(Services.Workspace:GetDescendants()) do
+        if obj:IsA("BasePart") and (obj.Name:find("Hitbox") or obj.Name:find("DN") or obj.Name == "Hitbox") then
+            pcall(function() obj:Destroy() end)
+        end
     end
-    -- Adições para restaurar tudo
+    
+    for _, obj in ipairs(LocalPlayer.Character:GetDescendants()) do
+        if obj.Name:find("DNMenu") or obj.Name:find("DN_") then
+            pcall(function() obj:Destroy() end)
+        end
+    end
+    
+    -- Resetar physics
+    local hrp = Utils.GetRootPart()
+    if hrp then
+        pcall(function()
+            hrp.Velocity = Vector3.new(0, 0, 0)
+            hrp.RotVelocity = Vector3.new(0, 0, 0)
+            hrp.Anchored = false
+        end)
+    end
+    
+    local humanoid = Utils.GetHumanoid()
+    if humanoid then
+        pcall(function()
+            humanoid.WalkSpeed = 16
+            humanoid.JumpPower = 50
+        end)
+    end
+    
+    -- Resetar configurações
     PlayerModule.SetCameraFOV(Config.Defaults.CameraFOV)
-    State.Features.Speed.value = Config.Defaults.Speed
-    State.Vehicles.unlockRange = Config.Defaults.VehicleRange
-    State.Features.ESP.color = Color3.fromRGB(138, 43, 226)
-    State.Features.ESPSkeleton.color = Color3.fromRGB(138, 43, 226)
-    State.Features.ESPAdmin.adminColor = Color3.fromRGB(255, 0, 0)
-    State.Features.Chams.fillColor = Color3.fromRGB(138, 43, 226)
-    State.Features.Chams.outlineColor = Color3.fromRGB(75, 0, 130)
-    State.Features.Aimbot.FOVColor = Color3.fromRGB(138, 43, 226)
-    State.Features.Aimbot.SilentFOVColor = Color3.fromRGB(255, 0, 0)
+    State.Vehicles.cache = {}
+    
+    if requireCache then
+        for k in pairs(requireCache) do
+            requireCache[k] = nil
+        end
+    end
+    
+    task.wait(0.5)
+    
+    -- Restaurar namecall
+    pcall(function()
+        hookmetamethod(game, "__namecall", oldNamecall)
+    end)
 end
 local function SetupAutoCleanup(Window)
     LocalPlayer.AncestryChanged:Connect(function()
@@ -2245,8 +2227,8 @@ local function BypassTelagem(WindUI)
         end
     end
     WindUI:Notify({
-        Title = "Bypass Telagem",
-        Content = "Todas as funcionalidades foram desativadas",
+        Title = "Bypass",
+        Content = "Deleta rastros, porém isso é apenas dentro do jogo. Não altera o executor. Apenas deixa seu jogo 100% limpo, quando você for obrigado a não kitar.",
         Icon = "power",
         Duration = 3
     })
@@ -2438,18 +2420,6 @@ State.Features.CarESP.toggle = EspSection:Toggle({
     end
 })
 
--- Toggle Chams
-State.Features.Chams.toggle = EspSection:Toggle({
-    Title = "Chams",
-    Desc = "Destaca jogadores com contorno 3D",
-    Icon = "check",
-    Type = "Checkbox",
-    IconSize = 16,
-    Callback = function(value)
-        VisualModule.ActivateChams(value)
-    end
-})
-
 -- Toggle Fullbright
 State.Features.Fullbright.toggle = EspSection:Toggle({
     Title = "Fullbright",
@@ -2462,42 +2432,36 @@ State.Features.Fullbright.toggle = EspSection:Toggle({
     end
 })
 
--- Toggle Self ESP
-State.Features.ESP.selfESPToggle = EspSection:Toggle({
-    Title = "Self ESP",
-    Desc = "Mostra ESP no próprio jogador",
-    Default = false,
-    Icon = "check",
-    Type = "Checkbox",
-    IconSize = 16,
-    Callback = function(value)
-        VisualModule.UpdateSelfESP(value)
-    end
-})
-
--- Toggle Visible Check
-State.Features.ESP.visibleCheckToggle = EspSection:Toggle({
-    Title = "Visible Check",
-    Desc = "Cores diferentes para jogadores atrás de paredes",
-    Default = true,
-    Icon = "check",
-    Type = "Checkbox",
-    IconSize = 16,
-    Callback = function(value)
-        VisualModule.UpdateVisibleCheck(value)
-    end
-})
-
--- Toggle Tracers
 EspSection:Toggle({
-    Title = "Tracers (Linhas)",
-    Desc = "Linhas conectando você aos jogadores",
-    Default = false,
+    Title = "Tracer",
+    Desc = "Linhas da tela até o jogador",
     Icon = "check",
     Type = "Checkbox",
     IconSize = 16,
     Callback = function(value)
-        VisualModule.ToggleTracers(value)
+        VisualModule.ToggleTracer(value)
+    end
+})
+
+EspSection:Toggle({
+    Title = "Self ESP",
+    Desc = "Mostra seu próprio ESP",
+    Icon = "check",
+    Type = "Checkbox",
+    IconSize = 16,
+    Callback = function(value)
+        VisualModule.ToggleSelfESP(value)
+    end
+})
+
+EspSection:Toggle({
+    Title = "Visible Check (Chams)",
+    Desc = "Chams só aparecem através de paredes",
+    Icon = "check",
+    Type = "Checkbox",
+    IconSize = 16,
+    Callback = function(value)
+        VisualModule.ToggleVisibleCheck(value)
     end
 })
 
@@ -2528,6 +2492,15 @@ VisualColorsSection:Colorpicker({
     Default = State.Features.ESP.invisibleBoxColor,
     Callback = function(value)
         VisualModule.UpdateInvisibleBoxColor(value)
+    end
+})
+
+VisualColorsSection:Colorpicker({
+    Title = "Cor do Tracer",
+    Desc = "Cor das linhas tracer",
+    Default = State.Features.ESP.tracerColor,
+    Callback = function(value)
+        VisualModule.UpdateTracerColor(value)
     end
 })
 
@@ -3152,8 +3125,8 @@ IconSize = 8*2,
     task.wait(0.5)
     updatePortaMalas()
     local WeaponTab = Window:Tab({
-        Title = "Weapon",
-        Icon = "axe",
+        Title = "Armas",
+        Icon = "rbxassetid://127779746992275",
         IconColor = Color3.fromRGB(138, 43, 226),
     })
     local WeaponSection = WeaponTab:Section({
@@ -3572,15 +3545,6 @@ IconSize = 8*2,
     })
 
 SettingsTab:Section({Title = "Usuário"})
-SettingsTab:Toggle({
-    Title = "Anônimo",
-    Desc = "Ativa/desativa modo anônimo",
-    Default = false,
-    Callback = function(value)
-        Config.User.Anonymous = value
-    end
-})
-
     local DangerZoneSection = SettingsTab:Section({
         Title = "Área de telagem",
         Icon = "triangle-alert",
@@ -3717,6 +3681,22 @@ local Window = WindUI:CreateWindow({
     AddMenuElements(Window, WindUI)
 end
 local function Main()
+
+    pcall(function()
+        local oldNamecall
+        oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
+            local method = getnamecallmethod()
+            if method == "Kick" then
+                return
+            end
+            return oldNamecall(self, ...)
+        end)
+    end)
+    
+    if not LocalPlayer.Character then
+        LocalPlayer.CharacterAdded:Wait()
+    end
+
     if not LocalPlayer.Character then
         LocalPlayer.CharacterAdded:Wait()
     end
