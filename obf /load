@@ -561,7 +561,25 @@ end
 function VisualModule.ToggleSelfESP(enabled)
     State.Features.ESP.showLocalPlayer = enabled
     if State.Features.ESP.loaded then
-        ExunysDeveloperESP.Settings.ShowLocalPlayer = enabled
+        pcall(function()
+            ExunysDeveloperESP.Settings.ShowLocalPlayer = enabled
+            
+            -- Forçar atualização do ESP
+            if enabled then
+                -- Unwrap e re-wrap do LocalPlayer para forçar renderização
+                local localEntry = ExunysDeveloperESP:GetEntry(LocalPlayer)
+                if localEntry then
+                    ExunysDeveloperESP:UnwrapObject(localEntry.Hash)
+                    task.wait(0.1)
+                    ExunysDeveloperESP:WrapObject(LocalPlayer)
+                end
+            else
+                local localEntry = ExunysDeveloperESP:GetEntry(LocalPlayer)
+                if localEntry then
+                    ExunysDeveloperESP:UnwrapObject(localEntry.Hash)
+                end
+            end
+        end)
     end
 end
 
@@ -650,6 +668,17 @@ function VisualModule.ActivateChams(enabled)
             ExunysDeveloperESP.Properties.Chams.Enabled = enabled
             ExunysDeveloperESP.Properties.Chams.Color = State.Features.Chams.fillColor
             ExunysDeveloperESP.Properties.Chams.Transparency = 0.5
+            ExunysDeveloperESP.Properties.Chams.Filled = false
+            ExunysDeveloperESP.Properties.Chams.Thickness = 1
+            ExunysDeveloperESP.Properties.Chams.VisibleCheck = State.Features.ESP.visibleCheck
+        end)
+    end
+end
+
+function VisualModule.UpdateChamsColors()
+    if State.Features.ESP.loaded and State.Features.Chams.active then
+        pcall(function()
+            ExunysDeveloperESP.Properties.Chams.Color = State.Features.Chams.fillColor
         end)
     end
 end
@@ -695,22 +724,41 @@ function VisualModule.ActivateCarESP(enabled)
     State.Features.CarESP.active = enabled
     
     if enabled then
+        -- Forçar atualização do cache
         Utils.UpdateVehicleCache(true)
         
+        -- Limpar objetos anteriores
+        pcall(function()
+            for Hash, entry in pairs(ExunysDeveloperESP.UtilityAssets.WrappedObjects or {}) do
+                if not entry.IsAPlayer then
+                    ExunysDeveloperESP:UnwrapObject(nil, Hash)
+                end
+            end
+        end)
+        
+        task.wait(0.2)
+        
+        -- Adicionar todos os veículos
         for _, vehicle in ipairs(State.Vehicles.cache) do
-            local chassis = vehicle:FindFirstChild("Chassis")
-            if chassis then
+            -- Tentar encontrar a parte principal do veículo
+            local mainPart = vehicle:FindFirstChild("Chassis") 
+                or vehicle:FindFirstChild("DriveSeat", true) 
+                or vehicle:FindFirstChild("VehicleSeat", true)
+                or vehicle:FindFirstChildWhichIsA("BasePart", true)
+            
+            if mainPart then
                 pcall(function()
-                    ExunysDeveloperESP:WrapObject(
-                        chassis,
+                    local hash = ExunysDeveloperESP:WrapObject(
+                        mainPart,
                         vehicle.Name,
-                        {ESP = true, Box = true, Tracer = false},
-                        300
+                        {ESP = true, Box = true, Tracer = false, HeadDot = false, HealthBar = false, Chams = false},
+                        300 -- Render distance
                     )
                 end)
             end
         end
     else
+        -- Desativar: remover todos os veículos
         pcall(function()
             for Hash, entry in pairs(ExunysDeveloperESP.UtilityAssets.WrappedObjects or {}) do
                 if not entry.IsAPlayer then
@@ -1325,60 +1373,62 @@ function ExploitModule.VehicleRain()
     local targetHRP = Utils.GetRootPart(player)
     if not targetHRP then return false, "Jogador inválido" end
     
-    local telekinesisTool = LocalPlayer.Backpack:FindFirstChild("Telekinesis V6")
-    if not telekinesisTool then
-        loadstring(game:HttpGet(Config.externos.Telekinesis))()
-        task.wait(0.5)
-        telekinesisTool = LocalPlayer.Backpack:FindFirstChild("Telekinesis V6")
-    end
-    
-    if not telekinesisTool then return false, "Telecinese não disponível" end
-    
-    telekinesisTool.Parent = LocalPlayer.Character
-    task.wait(0.2)
-    
     local myHRP = Utils.GetRootPart()
     if not myHRP then return false, "HRP não encontrado" end
     
     Utils.UpdateVehicleCache(true)
     local vehiclesMoved = 0
+    local targetPos = targetHRP.Position
     
     for _, vehicle in ipairs(State.Vehicles.cache) do
         local driveSeat = vehicle:FindFirstChild("DriveSeat", true) or vehicle:FindFirstChild("VehicleSeat", true)
         
+        -- Apenas assentos vazios (sem ocupante)
         if driveSeat and not driveSeat.Occupant then
+            -- TELEPORTE BÁSICO E DIRETO
             myHRP.CFrame = driveSeat.CFrame
-            task.wait(0.1)
+            task.wait(0.05) -- Reduzido para ser mais rápido
             
+            -- Sentar no veículo
             local humanoid = Utils.GetHumanoid()
-            if humanoid then
+            if humanoid and driveSeat:IsA("VehicleSeat") then
                 driveSeat:Sit(humanoid)
-                task.wait(0.1)
+                task.wait(0.05)
             end
             
+            -- Teleportar veículo acima do alvo (MAIS RÁPIDO)
             local mainPart = Utils.GetVehicleMainPart(vehicle)
             if mainPart then
-                local targetPos = targetHRP.Position + Vector3.new(0, 50 + (vehiclesMoved * 10), 0)
-                mainPart.CFrame = CFrame.new(targetPos)
+                -- Posição: acima do alvo + offset vertical por veículo
+                local dropHeight = 80 + (vehiclesMoved * 15) -- Altura maior e mais espaçamento
+                local dropPos = targetPos + Vector3.new(0, dropHeight, 0)
                 
+                -- TELEPORTE DIRETO (sem BodyVelocity inicialmente)
+                mainPart.CFrame = CFrame.new(dropPos)
+                task.wait(0.05)
+                
+                -- Adicionar velocidade de queda RÁPIDA
                 local bodyVelocity = Instance.new("BodyVelocity")
                 bodyVelocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-                bodyVelocity.Velocity = Vector3.new(0, -50, 0)
+                bodyVelocity.Velocity = Vector3.new(0, -120, 0) -- Queda MUITO rápida
                 bodyVelocity.Parent = mainPart
                 
-                task.delay(2, function()
+                -- Remover após 1.5 segundos
+                task.delay(1.5, function()
                     if bodyVelocity and bodyVelocity.Parent then
                         bodyVelocity:Destroy()
                     end
                 end)
                 
                 vehiclesMoved = vehiclesMoved + 1
-                task.wait(0.3)
+                task.wait(0.1) -- Intervalo reduzido
             end
         end
     end
     
-    telekinesisTool.Parent = LocalPlayer.Backpack
+    -- Teleportar jogador para longe do impacto
+    task.wait(0.2)
+    myHRP.CFrame = targetHRP.CFrame * CFrame.new(50, 20, 0) -- Teleporte seguro
     
     return true, vehiclesMoved .. " veículo(s) lançado(s)"
 end
@@ -1665,71 +1715,136 @@ function CombatModule.ActivateHeadHitboxExpander(enabled)
     local feature = State.Features.HeadHitboxExpander
     feature.active = enabled
     
+    -- Limpar hitboxes existentes
+    for userId, hitbox in pairs(feature.hitboxParts) do
+        if hitbox and hitbox.Parent then
+            pcall(function() hitbox:Destroy() end)
+        end
+    end
+    feature.hitboxParts = {}
+    
     if enabled then
+        -- Função para criar hitbox em um jogador
+        local function createHitbox(player)
+            if player == LocalPlayer then return end
+            if not player.Character then return end
+            
+            local head = player.Character:FindFirstChild("Head")
+            if not head then return end
+            
+            -- Verificar se já existe
+            if feature.hitboxParts[player.UserId] and feature.hitboxParts[player.UserId].Parent then
+                return
+            end
+            
+            -- Criar hitbox
+            local hitbox = Instance.new("Part")
+            hitbox.Name = "DN_Hitbox_" .. player.Name
+            hitbox.Size = Vector3.new(feature.size, feature.size, feature.size)
+            hitbox.Transparency = feature.transparency
+            hitbox.CanCollide = false
+            hitbox.Anchored = false
+            hitbox.Massless = true
+            hitbox.Material = Enum.Material.ForceField
+            hitbox.Color = Color3.fromRGB(138, 43, 226)
+            hitbox.CastShadow = false
+            
+            -- Weld para seguir a cabeça
+            local weld = Instance.new("WeldConstraint")
+            weld.Part0 = head
+            weld.Part1 = hitbox
+            weld.Parent = hitbox
+            
+            hitbox.CFrame = head.CFrame
+            hitbox.Parent = head
+            
+            feature.hitboxParts[player.UserId] = hitbox
+        end
+        
+        -- Criar hitboxes para jogadores existentes
         for _, player in ipairs(Services.Players:GetPlayers()) do
-            if player ~= LocalPlayer and player.Character then
-                local head = player.Character:FindFirstChild("Head")
-                if head then
-                    local hitbox = Instance.new("Part")
-                    hitbox.Name = "Hitbox"
-                    hitbox.Transparency = feature.transparency
-                    hitbox.Size = Vector3.new(feature.size, feature.size, feature.size)
-                    hitbox.CanCollide = false
-                    hitbox.Anchored = false
-                    hitbox.Material = Enum.Material.Neon
-                    hitbox.Color = Color3.fromRGB(138, 43, 226)
-                    hitbox.CFrame = head.CFrame
-                    hitbox.Massless = true
-                    
-                    local weld = Instance.new("Weld")
-                    weld.Part0 = head
-                    weld.Part1 = hitbox
-                    weld.C0 = CFrame.new()
-                    weld.Parent = hitbox
-                    
-                    hitbox.Parent = head
-                    feature.hitboxParts[player.UserId] = hitbox
-                end
+            pcall(function()
+                createHitbox(player)
+            end)
+        end
+        
+        -- Monitorar novos jogadores
+        feature.playerAddedConnection = Services.Players.PlayerAdded:Connect(function(player)
+            if not feature.active then return end
+            
+            player.CharacterAdded:Connect(function(char)
+                task.wait(1) -- Esperar personagem carregar
+                if not feature.active then return end
+                pcall(function()
+                    createHitbox(player)
+                end)
+            end)
+        end)
+        
+        -- Monitorar characters existentes
+        for _, player in ipairs(Services.Players:GetPlayers()) do
+            if player ~= LocalPlayer then
+                player.CharacterAdded:Connect(function(char)
+                    task.wait(1)
+                    if not feature.active then return end
+                    pcall(function()
+                        createHitbox(player)
+                    end)
+                end)
             end
         end
         
-        Services.Players.PlayerAdded:Connect(function(player)
+        -- Loop de verificação (recria hitboxes se sumirem)
+        feature.updateConnection = Services.RunService.Heartbeat:Connect(function()
             if not feature.active then return end
-            player.CharacterAdded:Connect(function(char)
-                task.wait(0.5)
-                if not feature.active then return end
-                local head = char:FindFirstChild("Head")
-                if head then
-                    local hitbox = Instance.new("Part")
-                    hitbox.Name = "Hitbox"
-                    hitbox.Transparency = feature.transparency
-                    hitbox.Size = Vector3.new(feature.size, feature.size, feature.size)
-                    hitbox.CanCollide = false
-                    hitbox.Anchored = false
-                    hitbox.Material = Enum.Material.Neon
-                    hitbox.Color = Color3.fromRGB(138, 43, 226)
-                    hitbox.CFrame = head.CFrame
-                    hitbox.Massless = true
-                    
-                    local weld = Instance.new("Weld")
-                    weld.Part0 = head
-                    weld.Part1 = hitbox
-                    weld.C0 = CFrame.new()
-                    weld.Parent = hitbox
-                    
-                    hitbox.Parent = head
-                    feature.hitboxParts[player.UserId] = hitbox
+            
+            for _, player in ipairs(Services.Players:GetPlayers()) do
+                if player ~= LocalPlayer and player.Character then
+                    local head = player.Character:FindFirstChild("Head")
+                    if head then
+                        local existingHitbox = feature.hitboxParts[player.UserId]
+                        
+                        -- Se não existe ou foi removido, recriar
+                        if not existingHitbox or not existingHitbox.Parent then
+                            pcall(function()
+                                createHitbox(player)
+                            end)
+                        else
+                            -- Atualizar transparência
+                            existingHitbox.Transparency = feature.transparency
+                            existingHitbox.Size = Vector3.new(feature.size, feature.size, feature.size)
+                        end
+                    end
                 end
-            end)
+            end
         end)
     else
-        for _, hitbox in pairs(feature.hitboxParts) do
+        -- Desativar: limpar tudo
+        if feature.playerAddedConnection then
+            feature.playerAddedConnection:Disconnect()
+            feature.playerAddedConnection = nil
+        end
+        
+        if feature.updateConnection then
+            feature.updateConnection:Disconnect()
+            feature.updateConnection = nil
+        end
+        
+        for userId, hitbox in pairs(feature.hitboxParts) do
             if hitbox and hitbox.Parent then
-                hitbox:Destroy()
+                pcall(function() hitbox:Destroy() end)
             end
         end
         feature.hitboxParts = {}
     end
+end
+
+function CombatModule.SetHitboxSize(size)
+    State.Features.HeadHitboxExpander.size = math.clamp(size, 5, 50)
+end
+
+function CombatModule.SetHitboxTransparency(transparency)
+    State.Features.HeadHitboxExpander.transparency = math.clamp(transparency, 0, 1)
 end
 
 
@@ -2128,7 +2243,6 @@ local function PerformCleanup()
     ExploitModule.ActivateAutoUnlock(false)
     ExploitModule.ActivateVehicleDelete(false)
     ExploitModule.ActivateVehicleFly(false)
-    ExploitModule.ActivateVehicleNoclip(false)
     CombatModule.ActivateHeadHitboxExpander(false)
     PlayerModule.ActivateNoclip(false)
     PlayerModule.ActivateSpeed(false)
@@ -2144,6 +2258,14 @@ local function PerformCleanup()
             Utils.ClearConnections(feature.connections)
             feature.connections = {}
         end
+        if feature.playerAddedConnection then
+            pcall(function() feature.playerAddedConnection:Disconnect() end)
+            feature.playerAddedConnection = nil
+        end
+        if feature.updateConnection then
+            pcall(function() feature.updateConnection:Disconnect() end)
+            feature.updateConnection = nil
+        end
     end
     
     -- Cleanups específicos
@@ -2154,22 +2276,24 @@ local function PerformCleanup()
         pcall(function() State.Features.Chams.folder:Destroy() end)
     end
     
+    -- Limpar hitboxes
     if State.Features.HeadHitboxExpander.hitboxParts then
         for _, hitbox in pairs(State.Features.HeadHitboxExpander.hitboxParts) do
             if hitbox and hitbox.Parent then
-                hitbox:Destroy()
+                pcall(function() hitbox:Destroy() end)
             end
         end
         State.Features.HeadHitboxExpander.hitboxParts = {}
     end
     
-    -- Limpar parts suspeitas
+    -- Limpar parts suspeitas do workspace
     for _, obj in ipairs(Services.Workspace:GetDescendants()) do
-        if obj:IsA("BasePart") and (obj.Name:find("Hitbox") or obj.Name:find("DN") or obj.Name == "Hitbox") then
+        if obj:IsA("BasePart") and (obj.Name:find("DN_Hitbox") or obj.Name:find("DNMenu") or obj.Name:find("DN_")) then
             pcall(function() obj:Destroy() end)
         end
     end
     
+    -- Limpar parts do character
     for _, obj in ipairs(LocalPlayer.Character:GetDescendants()) do
         if obj.Name:find("DNMenu") or obj.Name:find("DN_") then
             pcall(function() obj:Destroy() end)
@@ -3126,7 +3250,7 @@ IconSize = 8*2,
     updatePortaMalas()
     local WeaponTab = Window:Tab({
         Title = "Armas",
-        Icon = "rbxassetid://127779746992275",
+        Icon = "swords",
         IconColor = Color3.fromRGB(138, 43, 226),
     })
     local WeaponSection = WeaponTab:Section({
